@@ -1,12 +1,10 @@
 import pwnagotchi.plugins as plugins
-import pwnagotchi
 import logging
 import subprocess
-import time
 
 class ext_wifi(plugins.Plugin):
     __author__ = 'chris@holycityhosting.com'
-    __version__ = '1.0.0'
+    __version__ = '1.2.0'
     __license__ = 'GPL3'
     __description__ = 'Activates external wifi adapter'
 
@@ -16,32 +14,66 @@ class ext_wifi(plugins.Plugin):
         self.network = ''
 
     def on_loaded(self):
-        for opt in ['mode']:
-            if opt not in self.options or (opt in self.options and self.options[opt] is None):
-                logging.error(f"Set WiFi adapter mode configuration for internal or external.")
+        required_options = ['mode', 'interface', 'internal_interface']
+        for opt in required_options:
+            if opt not in self.options or self.options[opt] is None:
+                logging.error(f"Set WiFi adapter {opt} configuration.")
                 return
-        _log("plugin loaded")
+        
+        _log("Plugin loaded")
         self.ready = 1
         mode = self.options['mode']
         interface = self.options['interface']
-        if (mode == "external"):
-            subprocess.run('sed -i s/mon0/{interface}/g /usr/bin/bettercap-launcher'.format(interface=interface), shell=True).stdout
-            subprocess.run('sed -i s/mon0/{interface}/g /usr/local/share/bettercap/caplets/pwnagotchi-auto.cap'.format(interface=interface), shell=True).stdout
-            subprocess.run('sed -i s/mon0/{interface}/g /usr/local/share/bettercap/caplets/pwnagotchi-manual.cap'.format(interface=interface), shell=True).stdout
-            subprocess.run('sed -i s/mon0/{interface}/g /etc/pwnagotchi/config.toml'.format(interface=interface), shell=True).stdout
-            subprocess.run('sed -i s/mon0/{interface}/g /usr/bin/pwnlib'.format(interface=interface), shell=True).stdout
-            _log("External adapter activated")
+        internal_interface = self.options['internal_interface']
+        
+        if mode == "external":
+            self._activate_external(interface)
         else:
-            subprocess.run('sed -i s/{interface}/mon0/g /usr/bin/bettercap-launcher'.format(interface=interface), shell=True).stdout
-            subprocess.run('sed -i s/{interface}/mon0/g /usr/local/share/bettercap/caplets/pwnagotchi-auto.cap'.format(interface=interface), shell=True).stdout
-            subprocess.run('sed -i s/{interface}/mon0/g /usr/local/share/bettercap/caplets/pwnagotchi-manual.cap'.format(interface=interface), shell=True).stdout
-            subprocess.run('sed -i s/{interface}/mon0/g /etc/pwnagotchi/config.toml'.format(interface=interface), shell=True).stdout
-            subprocess.run('sed -i s/{interface}/mon0/g /usr/bin/pwnlib'.format(interface=interface), shell=True).stdout
-            _log("Internal adapter activated")
+            self._activate_internal(internal_interface)
+        
+        self._reset_services()
 
-def _run(cmd):
-    result = subprocess.run(cmd, shell=True, stdin=None, stderr=None, stdout=subprocess.PIPE, executable="/bin/bash")
-    return result.stdout.decode('utf-8').strip()
+    def _activate_external(self, interface):
+        files_to_update = [
+            '/usr/bin/bettercap-launcher',
+            '/usr/local/share/bettercap/caplets/pwnagotchi-auto.cap',
+            '/usr/local/share/bettercap/caplets/pwnagotchi-manual.cap',
+            '/etc/pwnagotchi/config.toml',
+            '/usr/bin/pwnlib'
+        ]
+        for file in files_to_update:
+            self._replace_in_file(file, 'mon0', interface)
+        _log("External adapter activated")
+
+    def _activate_internal(self, internal_interface):
+        files_to_update = [
+            '/usr/bin/bettercap-launcher',
+            '/usr/local/share/bettercap/caplets/pwnagotchi-auto.cap',
+            '/usr/local/share/bettercap/caplets/pwnagotchi-manual.cap',
+            '/etc/pwnagotchi/config.toml',
+            '/usr/bin/pwnlib'
+        ]
+        for file in files_to_update:
+            self._replace_in_file(file, 'mon0', internal_interface)
+        _log("Internal adapter activated")
+
+    def _replace_in_file(self, filepath, old, new):
+        try:
+            subprocess.run(f'sed -i s/{old}/{new}/g {filepath}', shell=True, check=True)
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Failed to update {filepath}: {e}")
+
+    def _reset_services(self):
+        services_to_restart = [
+            'bettercap',
+            'pwnagotchi'
+        ]
+        for service in services_to_restart:
+            try:
+                subprocess.run(f'systemctl restart {service}', shell=True, check=True)
+                _log(f"Service {service} restarted")
+            except subprocess.CalledProcessError as e:
+                logging.error(f"Failed to restart service {service}: {e}")
 
 def _log(message):
-    logging.info('[ext_wifi] %s' % message)
+    logging.info(f'[ext_wifi] {message}')
