@@ -28,10 +28,10 @@ class ext_wifi(plugins.Plugin):
         
         if mode == "external":
             self._activate_external(interface)
-        else:
+        elif mode == "internal":
             self._activate_internal(internal_interface)
         
-        self._reset_services()
+        self._notify_reboot_needed()
 
     def _activate_external(self, interface):
         files_to_update = [
@@ -63,17 +63,8 @@ class ext_wifi(plugins.Plugin):
         except subprocess.CalledProcessError as e:
             logging.error(f"Failed to update {filepath}: {e}")
 
-    def _reset_services(self):
-        services_to_restart = [
-            'bettercap',
-            'pwnagotchi'
-        ]
-        for service in services_to_restart:
-            try:
-                subprocess.run(f'systemctl restart {service}', shell=True, check=True)
-                _log(f"Service {service} restarted")
-            except subprocess.CalledProcessError as e:
-                logging.error(f"Failed to restart service {service}: {e}")
+    def _notify_reboot_needed(self):
+        _log("Changes applied. Please reboot your Pwnagotchi for changes to take effect.")
 
 def _log(message):
     logging.info(f'[ext_wifi] {message}')
