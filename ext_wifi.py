@@ -3,7 +3,7 @@ import logging
 import subprocess
 
 class ext_wifi(plugins.Plugin):
-    __author__ = 'chris@holycityhosting.com'
+    __author__ = 'Allordacia'
     __version__ = '1.2.0'
     __license__ = 'GPL3'
     __description__ = 'Activates external wifi adapter'
@@ -14,24 +14,33 @@ class ext_wifi(plugins.Plugin):
         self.network = ''
 
     def on_loaded(self):
-        required_options = ['mode', 'interface', 'internal_interface']
-        for opt in required_options:
-            if opt not in self.options or self.options[opt] is None:
-                logging.error(f"Set WiFi adapter {opt} configuration.")
+        try:
+            mode = self.options.get('mode')
+            interface = self.options.get('interface')
+            internal_interface = self.options.get('internal_interface')
+
+            if not mode:
+                logging.error("Set WiFi adapter mode configuration.")
                 return
-        
-        _log("Plugin loaded")
-        self.ready = 1
-        mode = self.options['mode']
-        interface = self.options['interface']
-        internal_interface = self.options['internal_interface']
-        
-        if mode == "external":
-            self._activate_external(interface)
-        elif mode == "internal":
-            self._activate_internal(internal_interface)
-        
-        self._notify_reboot_needed()
+            if not interface:
+                logging.error("Set WiFi adapter interface configuration.")
+                return
+            if not internal_interface:
+                logging.error("Set WiFi adapter internal_interface configuration.")
+                return
+
+            _log("Plugin loaded")
+            self.ready = 1
+
+            if mode == "external":
+                self._activate_external(interface)
+            elif mode == "internal":
+                self._activate_internal(internal_interface)
+
+            self._notify_reboot_needed()
+
+        except Exception as e:
+            logging.error(f"Error during plugin loading: {e}")
 
     def _activate_external(self, interface):
         files_to_update = [
